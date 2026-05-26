@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using KodaMate.Converters;
+using KodaMate.Helpers;
 using KodaMate.Models;
 
 namespace KodaMate.Services;
@@ -144,18 +145,8 @@ public class DistributeurApiService : IDistributeurService
         response.EnsureSuccessStatusCode();
 
         var raw = await response.Content.ReadAsStringAsync();
-        try
-        {
-            var doc = JsonDocument.Parse(raw);
-            foreach (var field in new[] { "response", "answer", "output", "text", "message", "reply" })
-            {
-                if (doc.RootElement.TryGetProperty(field, out var val))
-                    return val.GetString() ?? raw;
-            }
-        }
-        catch { }
-
-        return raw;
+        var display = N8nResponseParser.ExtractDisplayText(raw);
+        return string.IsNullOrWhiteSpace(display) ? raw : display;
     }
 
     public async Task<List<ConversationBackend>> GetLastConversationsAsync()

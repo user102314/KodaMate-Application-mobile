@@ -106,6 +106,10 @@
                                 </LinearGradientBrush>
                             </Border.Background>
                             <VerticalStackLayout Spacing="4">
+                                <Image Source="{Binding ImagePath}"
+                                       IsVisible="{Binding ImagePath, Converter={StaticResource StringToBoolConverter}}"
+                                       HeightRequest="160"
+                                       Aspect="AspectFit"/>
                                 <Label Text="{Binding Content}"
                                        TextColor="{StaticResource White}"
                                        FontSize="15"
