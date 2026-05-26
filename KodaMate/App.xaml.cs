@@ -1,0 +1,88 @@
+﻿using KodaMate.Services;
+using KodaMate.Views;
+
+namespace KodaMate;
+
+public partial class App : Application
+{
+    public App(IServiceProvider services)
+    {
+        Services = services;
+        InitializeComponent();
+        MainPage = CreateLoadingPage();
+        _ = BootstrapAsync(services);
+    }
+
+    public static IServiceProvider Services { get; private set; } = null!;
+
+    public static void RelaunchFromSession(IServiceProvider? services = null)
+    {
+        services ??= Services;
+        if (Current is null) return;
+        Current.MainPage = ResolveMainPage(services);
+    }
+
+    private static async Task BootstrapAsync(IServiceProvider services)
+    {
+        try
+        {
+            var session = services.GetRequiredService<ISessionService>();
+            if (session.IsLoggedIn)
+                await SessionBootstrap.ValidateStoredSessionAsync(services).ConfigureAwait(false);
+        }
+        catch
+        {
+            services.GetRequiredService<ISessionService>().Clear();
+        }
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (Current is null) return;
+            var page = ResolveMainPage(services);
+            Current.MainPage = page;
+            if (page is AppShell shell)
+                shell.EnsureInitialTabLoaded();
+        });
+    }
+
+    private static Page CreateLoadingPage() =>
+        new ContentPage
+        {
+            BackgroundColor = Color.FromArgb("#121212"),
+            Content = new VerticalStackLayout
+            {
+                VerticalOptions = LayoutOptions.Center,
+                HorizontalOptions = LayoutOptions.Center,
+                Spacing = 20,
+                Children =
+                {
+                    new Image
+                    {
+                        Source = "koda_logo.png",
+                        HeightRequest = 160,
+                        WidthRequest = 160,
+                        Aspect = Aspect.AspectFit,
+                        HorizontalOptions = LayoutOptions.Center
+                    },
+                    new ActivityIndicator { IsRunning = true, Color = Color.FromArgb("#00E5FF") },
+                    new Label
+                    {
+                        Text = "Connexion au serveur…",
+                        TextColor = Color.FromArgb("#D1F7FF"),
+                        HorizontalOptions = LayoutOptions.Center,
+                        FontSize = 14
+                    }
+                }
+            }
+        };
+
+    private static Page ResolveMainPage(IServiceProvider services)
+    {
+        var session = services.GetRequiredService<ISessionService>();
+        if (!session.IsLoggedIn)
+            return services.GetRequiredService<LoginPage>();
+        if (!session.IsRobotConfigured)
+            return services.GetRequiredService<RobotSetupPage>();
+        return services.GetRequiredService<AppShell>();
+    }
+}
