@@ -15,6 +15,7 @@ public class HomeViewModel : BaseViewModel
     private readonly IWeatherService _weatherService;
     private readonly INavigationService _navigationService;
     private readonly IWifiModalService _wifiModal;
+    private readonly IBleConnectionService _ble;
 
     private bool _isRobotPoweredOn;
     private bool _isConnected;
@@ -30,11 +31,32 @@ public class HomeViewModel : BaseViewModel
     private bool _isPowerButtonAnimating;
     private string _cityName = AppConfig.CityName;
     private Color _wifiIndicatorColor = Color.FromArgb("#E53935");
+    private bool _isBleConnected;
+    private Color _bleIndicatorColor = Color.FromArgb("#E53935");
+    private string _bleTooltip = "BLE déconnecté";
 
     public Color WifiIndicatorColor
     {
         get => _wifiIndicatorColor;
         set => SetProperty(ref _wifiIndicatorColor, value);
+    }
+
+    public bool IsBleConnected
+    {
+        get => _isBleConnected;
+        private set => SetProperty(ref _isBleConnected, value);
+    }
+
+    public Color BleIndicatorColor
+    {
+        get => _bleIndicatorColor;
+        private set => SetProperty(ref _bleIndicatorColor, value);
+    }
+
+    public string BleTooltip
+    {
+        get => _bleTooltip;
+        private set => SetProperty(ref _bleTooltip, value);
     }
 
     public bool IsRobotPoweredOn
@@ -127,12 +149,14 @@ public class HomeViewModel : BaseViewModel
         IDistributeurService distributeurService,
         IWeatherService weatherService,
         INavigationService navigationService,
-        IWifiModalService wifiModal)
+        IWifiModalService wifiModal,
+        IBleConnectionService ble)
     {
         _distributeurService = distributeurService;
         _weatherService = weatherService;
         _navigationService = navigationService;
         _wifiModal = wifiModal;
+        _ble = ble;
 
         Title = "Home";
 
@@ -140,12 +164,41 @@ public class HomeViewModel : BaseViewModel
         RefreshCommand = new AsyncRelayCommand(RefreshAllAsync);
         OpenSettingsCommand = new AsyncRelayCommand(OpenSettingsAsync);
         OpenWifiNetworksCommand = new AsyncRelayCommand(OpenWifiNetworksAsync);
+
+        _ble.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(IBleConnectionService.IsConnected)
+                                or nameof(IBleConnectionService.State))
+            {
+                MainThread.BeginInvokeOnMainThread(SyncBleIndicator);
+            }
+        };
+        SyncBleIndicator();
+    }
+
+    private void SyncBleIndicator()
+    {
+        IsBleConnected = _ble.IsConnected;
+        BleIndicatorColor = _ble.IsConnected
+            ? Color.FromArgb("#43A047")
+            : Color.FromArgb("#E53935");
+        BleTooltip = _ble.State switch
+        {
+            BleConnectionState.Connected => "BLE connecté au robot",
+            BleConnectionState.Connecting => "BLE — connexion…",
+            BleConnectionState.Scanning => "BLE — recherche du robot…",
+            BleConnectionState.Failed => "BLE indisponible (retry auto)",
+            _ => "BLE inactif",
+        };
     }
 
     public override Task OnAppearingAsync()
     {
         UpdateWifiIndicator();
+        SyncBleIndicator();
         _ = RefreshAllAsync();
+        // Kick off BLE again in case bootstrap was interrupted.
+        _ = _ble.StartAsync();
         return Task.CompletedTask;
     }
 

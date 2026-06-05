@@ -35,6 +35,19 @@ public partial class App : Application
             services.GetRequiredService<ISessionService>().Clear();
         }
 
+        // Start scanning for the KODA Pi over BLE in the background. Plugin.BLE
+        // will prompt for the runtime BLE/location permissions the first time;
+        // we don't await this so it doesn't delay the UI boot.
+        try
+        {
+            var ble = services.GetRequiredService<IBleConnectionService>();
+            _ = ble.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[BLE] failed to start at bootstrap: {ex.Message}");
+        }
+
         MainThread.BeginInvokeOnMainThread(() =>
         {
             if (Current is null) return;

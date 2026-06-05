@@ -25,6 +25,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<ISessionService, SessionService>();
         builder.Services.AddSingleton<IWifiNetworkService, WifiNetworkService>();
         builder.Services.AddSingleton<IWifiModalService, WifiModalService>();
+        builder.Services.AddSingleton<IBleConnectionService, BleConnectionService>();
 
         builder.Services.AddSingleton<IDistributeurService, DistributeurApiService>();
         builder.Services.AddSingleton<IWeatherService, WeatherService>();

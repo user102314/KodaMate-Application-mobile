@@ -8,6 +8,7 @@ namespace KodaMate.ViewModels;
 public sealed class WifiNetworksViewModel : BaseViewModel
 {
     private readonly IWifiNetworkService _wifi;
+    private readonly IBleConnectionService _ble;
 
     public ObservableCollection<string> Networks { get; } = new();
 
@@ -15,9 +16,10 @@ public sealed class WifiNetworksViewModel : BaseViewModel
     public ICommand PickNetworkCommand { get; }
     public ICommand CloseCommand { get; }
 
-    public WifiNetworksViewModel(IWifiNetworkService wifi)
+    public WifiNetworksViewModel(IWifiNetworkService wifi, IBleConnectionService ble)
     {
         _wifi = wifi;
+        _ble = ble;
         Title = "Wi‑Fi";
         RefreshCommand = new AsyncRelayCommand(LoadAsync);
         PickNetworkCommand = new AsyncRelayCommand<string>(PickAsync);
@@ -51,9 +53,17 @@ public sealed class WifiNetworksViewModel : BaseViewModel
     {
         if (string.IsNullOrWhiteSpace(ssid)) return;
 
+        if (!_ble.IsConnected)
+        {
+            await PageAlerts.DisplayAlertAsync(
+                "Wi‑Fi",
+                "Le robot n'est pas joignable en Bluetooth. Approche-toi du robot et patiente — l'icône 🛰️ doit devenir verte avant d'envoyer le mot de passe.");
+            return;
+        }
+
         var pwd = await PageAlerts.DisplayPromptAsync(
             "Connexion Wi‑Fi",
-            $"Mot de passe pour « {ssid} » (simulation — aucune connexion réelle pour l’instant).",
+            $"Mot de passe pour « {ssid} » — envoyé au robot via Bluetooth.",
             placeholder: "Mot de passe",
             accept: "Valider",
             cancel: "Annuler");
@@ -61,8 +71,54 @@ public sealed class WifiNetworksViewModel : BaseViewModel
         if (pwd is null)
             return;
 
-        Preferences.Set("km_wifi_saved_ssid", ssid);
-        await PageAlerts.DisplayAlertAsync("Wi‑Fi", $"Réseau « {ssid} » enregistré localement (simulation).");
+        try
+        {
+            IsBusy = true;
+            await _ble.SendWifiCredentialsAsync(ssid, pwd);
+            Preferences.Set("km_wifi_saved_ssid", ssid);
+
+            // Wait briefly for the Pi to report a final state (connecting → connected/failed).
+            var deadline = DateTime.UtcNow.AddSeconds(20);
+            BleWifiStatus? final = null;
+            while (DateTime.UtcNow < deadline)
+            {
+                var status = _ble.LastWifiStatus;
+                if (status is not null && status.State is "connected" or "failed")
+                {
+                    final = status;
+                    break;
+                }
+                await Task.Delay(500);
+            }
+
+            if (final?.State == "connected")
+            {
+                await PageAlerts.DisplayAlertAsync(
+                    "Wi‑Fi",
+                    $"Le robot est maintenant sur « {final.Ssid} ». IP : {final.Ip}");
+            }
+            else if (final?.State == "failed")
+            {
+                await PageAlerts.DisplayAlertAsync(
+                    "Wi‑Fi — échec",
+                    $"Le robot n'a pas pu se connecter à « {ssid} ».\n{final.Error}");
+            }
+            else
+            {
+                await PageAlerts.DisplayAlertAsync(
+                    "Wi‑Fi",
+                    $"Demande envoyée pour « {ssid} ». Vérifie l'état dans Réglages — la connexion peut prendre encore quelques secondes.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await PageAlerts.DisplayAlertAsync("Wi‑Fi — erreur", ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
         await CloseAsync();
     }
 

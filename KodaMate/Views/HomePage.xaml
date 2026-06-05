@@ -26,7 +26,7 @@
                 <RoundRectangle CornerRadius="0,0,30,30"/>
             </Border.StrokeShape>
             
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
                 <Image Grid.Column="0"
                        Source="koda_logo.png"
                        HeightRequest="40"
@@ -51,8 +51,23 @@
                     </HorizontalStackLayout>
                 </VerticalStackLayout>
 
-                <!-- Wi‑Fi (rouge = non enregistré, vert = simulation enregistrée) -->
+                <!-- BLE link to the Pi (red = scanning/failed, green = connected) -->
                 <Border Grid.Column="2"
+                        BackgroundColor="{Binding BleIndicatorColor}"
+                        StrokeShape="RoundRectangle 22"
+                        Stroke="Transparent"
+                        WidthRequest="44"
+                        HeightRequest="44"
+                        VerticalOptions="Center"
+                        ToolTipProperties.Text="{Binding BleTooltip}">
+                    <Label Text="🛰️"
+                           FontSize="20"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"/>
+                </Border>
+
+                <!-- Wi‑Fi (rouge = non enregistré, vert = simulation enregistrée) -->
+                <Border Grid.Column="3"
                         BackgroundColor="{Binding WifiIndicatorColor}"
                         StrokeShape="RoundRectangle 22"
                         Stroke="Transparent"
@@ -71,7 +86,7 @@
                 </Border>
 
                 <!-- Settings Button -->
-                <Border Grid.Column="3"
+                <Border Grid.Column="4"
                         BackgroundColor="#20FFFFFF"
                         StrokeShape="RoundRectangle 12"
                         Stroke="Transparent"
